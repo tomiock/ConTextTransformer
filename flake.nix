@@ -72,9 +72,16 @@ EOF
             pythonPackages.matplotlib
             pythonPackages.numpy
             pythonPackages.ipykernel
+            pythonPackages.jupyterlab
 
             pythonPackages.torch
             pythonPackages.torchvision
+            pythonPackages.transformers
+            pythonPackages.sentence-transformers
+            pythonPackages.datasets
+            pythonPackages.fasttext
+            pythonPackages.einops
+            pythonPackages.easyocr
 
             # Tools
             pythonPackages.venvShellHook 
