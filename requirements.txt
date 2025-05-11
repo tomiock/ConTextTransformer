@@ -1,0 +1,10 @@
+numpy
+matplotlib
+
+torch
+torchvision
+
+fasttext
+einops
+easyocr
+opencv-python-headless
