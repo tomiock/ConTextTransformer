@@ -83,6 +83,8 @@ EOF
             pythonPackages.einops
             pythonPackages.easyocr
 
+            pythonPackages.scipy
+
             # Tools
             pythonPackages.venvShellHook 
 
