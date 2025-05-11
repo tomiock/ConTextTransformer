@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import fasttext
 import easyocr
@@ -41,13 +42,16 @@ class ConTextTransformer(nn.Module):
         self.pos_embedding = nn.Parameter(
             torch.randn(1, self.num_cnn_features + 1, dim)
         )
+
         self.cnn_feature_to_embedding = nn.Linear(self.dim_cnn_features, dim)
         self.fasttext_feature_to_embedding = nn.Linear(self.dim_fasttext_features, dim)
+
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
+
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=dim, nhead=heads, dim_feedforward=mlp_dim, batch_first=True
         )
-        encoder_norm = nn.LayerNorm(dim)
+        #encoder_norm = nn.LayerNorm(dim)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=depth)
 
         self.to_cls_token = nn.Identity()
@@ -116,7 +120,7 @@ class ConTextDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        return img, self.targets[idx] + 1
+        return img, self.targets[idx]
 
 
 def dataloader_collate(batch):
@@ -129,7 +133,6 @@ def dataloader_collate(batch):
 
         images.append(img)
         labels.append(label)
-
 
     images_batch = torch.stack(images, 0)
     labels_batch = torch.stack(labels, 0)
@@ -191,16 +194,30 @@ data_transforms_test = torchvision.transforms.Compose(
 
 images_dir = "data/images/"
 
-train_set = ConTextDataset(images_dir, "data/train.txt", transform=data_transforms_train)
+train_set = ConTextDataset(
+    images_dir, "data/train.txt", transform=data_transforms_train
+)
 val_set = ConTextDataset(images_dir, "data/val.txt", transform=data_transforms_test)
 train_loader = torch.utils.data.DataLoader(
-    train_set, batch_size=64, shuffle=True, num_workers=10, collate_fn=dataloader_collate,
+    train_set,
+    batch_size=64,
+    shuffle=True,
+    num_workers=10,
+    collate_fn=dataloader_collate,
 )
 test_loader = torch.utils.data.DataLoader(
-    val_set, batch_size=64, shuffle=False, num_workers=10, collate_fn=dataloader_collate,
+    val_set,
+    batch_size=64,
+    shuffle=False,
+    num_workers=10,
+    collate_fn=dataloader_collate,
 )
 
 reader = easyocr.Reader(["en"])
+
+fasttext.util.download_model("en", if_exists="ignore")
+fasttext_model = fasttext.load_model("cc.en.300.bin")
+
 
 def detect_text(img_filename):
     """Detects text in the image using EasyOCR"""
@@ -214,11 +231,12 @@ def detect_text(img_filename):
     return words, boxes, confs
 
 
-def train_epoch(model, optimizer, data_loader, loss_history):
+def train_epoch(model, optimizer, criterion, data_loader, loss_history, epoch):
     total_samples = len(data_loader.dataset)
     model.train()
 
-    for i, (data_img, target) in enumerate(data_loader):
+    train_pbar = tqdm(data_loader, desc=f"Epoch {epoch + 1} [TRAIN]")
+    for i, (data_img, target) in enumerate(train_pbar):
         data_img = data_img.to(device)
         target = target.to(device)
 
@@ -233,13 +251,23 @@ def train_epoch(model, optimizer, data_loader, loss_history):
             tokens = [det[1] for det in detections]
             batch_tokens.append(tokens)
 
-        batch_tokens = torch.tensor(batch_tokens)
-        batch_tokens.to(device)
+        text = np.zeros((64, 64, 300))
+        for i, w in enumerate(batch_tokens):
+            if w == []:
+                embedding = np.zeros((300,))
+            else:
+                w = " ".join(w)
+                embedding = fasttext_model.get_word_vector(w)
+            text[0, i, :] = embedding
+
+        text = torch.tensor(text)
 
         optimizer.zero_grad()
-        output = F.log_softmax(model(data_img, batch_tokens), dim=1)
-        loss = F.nll_loss(output, target)
+        output = model(data_img, text)
+
+        loss = criterion(output, target)
         loss.backward()
+
         optimizer.step()
 
         if i % 100 == 0:
@@ -312,6 +340,8 @@ for name, param in model.named_parameters():
     if param.requires_grad:
         params_to_update.append(param)
 
+criterion = torch.nn.CrossEntropyLoss()
+
 optimizer = torch.optim.Adam(params_to_update, lr=0.0001)
 
 scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -323,7 +353,7 @@ best_acc = 0.0
 
 for epoch in range(1, N_EPOCHS + 1):
     print("Epoch:", epoch)
-    train_epoch(model, optimizer, train_loader, train_loss_history)
+    train_epoch(model, optimizer, criterion, train_loader, train_loss_history, epoch)
     acc = evaluate(model, test_loader, test_loss_history)
     if acc > best_acc:
         torch.save(model.state_dict(), "all_best.pth")
