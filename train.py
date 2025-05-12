@@ -4,6 +4,7 @@ import time
 
 from typing import Any
 
+import wandb
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -22,6 +23,11 @@ from torch.utils.data import Dataset
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 print(torch.__version__)
+
+wandb.init(
+    entity='uni-DL-2025',
+    project='business',
+)
 
 
 class ConTextTransformer(nn.Module):
@@ -269,6 +275,8 @@ def train_epoch(model, optimizer, criterion, data_loader, loss_history, epoch):
         loss = criterion(output, target)
         loss.backward()
 
+        wandb.log({'train/batch_loss': loss.item()})
+
         optimizer.step()
 
         if i % 100 == 0:
@@ -361,3 +369,5 @@ for epoch in range(1, N_EPOCHS + 1):
     scheduler.step()
 
 print("Execution time:", "{:5.2f}".format(time.time() - start_time), "seconds")
+
+wandb.finish()
