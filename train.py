@@ -300,18 +300,41 @@ def evaluate(model, data_loader, loss_history):
     correct_samples = 0
     total_loss = 0
 
-    with torch.no_grad():
-        for data_img, data_txt, txt_mask, target in data_loader:
-            data_img = data_img.to(device)
-            data_txt = data_txt.to(device)
-            txt_mask = txt_mask.to(device)
-            target = target.to(device)
-            output = F.log_softmax(model(data_img, data_txt, txt_mask), dim=1)
-            loss = F.nll_loss(output, target, reduction="sum")
-            _, pred = torch.max(output, dim=1)
+    for i, (data_img, target) in enumerate(data_loader):
+        data_img = data_img.to(device)
+        target = target.to(device)
 
-            total_loss += loss.item()
-            correct_samples += pred.eq(target).sum()
+        cpu_images = data_img.cpu().numpy()
+        batch_tokens = []
+        for img in cpu_images:
+            if img.shape[0] == 3:
+                img = img.transpose(1, 2, 0)
+
+            detections = reader.readtext(img)
+
+            tokens = [det[1] for det in detections]
+            batch_tokens.append(tokens)
+
+        text = np.zeros((64, 64, 300))
+        for i, w in enumerate(batch_tokens):
+            if w == []:
+                embedding = np.zeros((300,))
+            else:
+                w = " ".join(w)
+                embedding = fasttext_model.get_word_vector(w)
+            text[0, i, :] = embedding
+
+        text = torch.tensor(text)
+        text = text.to(device)
+
+        optimizer.zero_grad()
+        output = model(data_img, text)
+
+        loss = criterion(output, target)
+        _, pred = torch.max(output, dim=1)
+
+        total_loss += loss.item()
+        correct_samples += pred.eq(target).sum()
 
     avg_loss = total_loss / total_samples
     loss_history.append(avg_loss)
