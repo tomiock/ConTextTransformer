@@ -261,6 +261,7 @@ def train_epoch(model, optimizer, criterion, data_loader, loss_history, epoch):
             text[0, i, :] = embedding
 
         text = torch.tensor(text)
+        text = text.to(device)
 
         optimizer.zero_grad()
         output = model(data_img, text)

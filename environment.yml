@@ -14,5 +14,6 @@ dependencies:
   - einops
   - easyocr
   - opencv-python-headless
-- numpy
-- matplotlib
+  - numpy
+  - matplotlib
+  - tqdm
