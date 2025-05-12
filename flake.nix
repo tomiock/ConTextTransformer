@@ -10,7 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        python = pkgs.python312; # Define the python interpreter
+        python = pkgs.python313; # Define the python interpreter
         pythonPackages = python.pkgs;
         lib-path = with pkgs; lib.makeLibraryPath [
           libffi
@@ -72,7 +72,6 @@ EOF
             pythonPackages.matplotlib
             pythonPackages.numpy
             pythonPackages.ipykernel
-            pythonPackages.jupyterlab
 
             pythonPackages.torch
             pythonPackages.torchvision
@@ -80,10 +79,12 @@ EOF
             pythonPackages.sentence-transformers
             pythonPackages.datasets
             pythonPackages.fasttext
-            pythonPackages.einops
             pythonPackages.easyocr
+            pythonPackages.einops
+            pythonPackages.tiktoken
+            pythonPackages.accelerate
 
-            pythonPackages.scipy
+            pythonPackages.wandb
 
             # Tools
             pythonPackages.venvShellHook 
@@ -119,7 +120,7 @@ EOF
             if [ ! -d "$VENV_DIR" ]; then
               echo "Creating Python virtual environment using uv in $VENV_DIR..."
               # Create the venv using uv, pointing to the Nix-provided Python
-              ${pkgs.uv}/bin/uv venv -p ${python}/bin/python3.12 "$VENV_DIR" 
+              ${pkgs.uv}/bin/uv venv -p ${python}/bin/python3.13 "$VENV_DIR" 
               echo "Virtual environment created."
             else
               echo "Using existing virtual environment in $VENV_DIR"
@@ -178,10 +179,10 @@ EOF
             VENV_DIR="${venvDir}" 
             
             # Ensure the target directory exists before creating symlinks
-            mkdir -p ./$VENV_DIR/lib/python3.12/site-packages/
+            mkdir -p ./$VENV_DIR/lib/python3.13/site-packages/
             
             # Symlink Nix store site-packages into the venv's site-packages
-            ln -sfn ${python.sitePackages}/* ./$VENV_DIR/lib/python3.12/site-packages/
+            ln -sfn ${python.sitePackages}/* ./$VENV_DIR/lib/python3.13/site-packages/
           '';
         };
 
