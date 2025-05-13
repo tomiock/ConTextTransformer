@@ -243,12 +243,13 @@ def train_epoch(model, optimizer, criterion, data_loader, loss_history, epoch):
 
     train_pbar = tqdm(data_loader, desc=f"Epoch {epoch + 1} [TRAIN]")
     for i, (data_img, target) in enumerate(train_pbar):
-        data_img = data_img.to(device)
+        # first we need the images to be on the CPU to be used for EasyOCR
+        # data_img = data_img.to(device)
+
         target = target.to(device)
 
-        cpu_images = data_img.cpu().numpy()
         batch_tokens = []
-        for img in cpu_images:
+        for img in data_img:
             if img.shape[0] == 3:
                 img = img.transpose(1, 2, 0)
 
